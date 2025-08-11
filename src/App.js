@@ -2,18 +2,19 @@ import React, { useState, useEffect, createContext, useContext, useCallback } fr
 import { createPortal } from 'react-dom';
 
 // The API_URL for your Google Apps Script Web App
-// IMPORTANT: Replace this with your actual deployed script URL
-const API_URL = "https://script.google.com/macros/s/AKfycbyTcViZ8D1YxXZzThlpVcD6Heku2Tutx9yPjHdln8FN52nArC8_9CfFXh-tb_20scgq/exec";
+// This is the latest URL you provided.
+const API_URL = "https://script.google.com/macros/s/AKfycbyVjh7tUIGsa8Z61kH4pWS94ANLrpPADp_HZJG7UBms_qKfmzDGecDP-sbFT6WcusRV/exec";
 
-// Fetches data from the Google Apps Script API.
-async function fetcher(endpoint, data = {}) {
+// The corrected fetcher function that sends the request in the correct format.
+// It now uses "action" and "payload" to match your Apps Script.
+async function fetcher(action, payload = {}) {
   try {
-    const response = await fetch(`${API_URL}?endpoint=${endpoint}`, {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ action, payload }),
     });
 
     if (!response.ok) {
@@ -22,8 +23,8 @@ async function fetcher(endpoint, data = {}) {
 
     return await response.json();
   } catch (error) {
-    console.error(`Error fetching data from endpoint ${endpoint}:`, error);
-    return { error: error.message };
+    console.error(`Error fetching data for action ${action}:`, error);
+    return { success: false, message: error.message };
   }
 }
 
@@ -37,7 +38,8 @@ const AuthProvider = ({ children }) => {
   const login = async (id, password, role) => {
     const response = await fetcher('login', { id, password, role });
     if (response.success) {
-      setUser({ id, name: response.name });
+      // Your Apps Script returns a user object. We should use it.
+      setUser(response.user);
       setRole(role);
       return true;
     }
@@ -159,7 +161,7 @@ const Table = ({ headers, data }) => (
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-200">
-        {data.length > 0 ? (
+        {data && data.length > 0 ? (
           data.map((row, index) => (
             <tr key={index} className="hover:bg-indigo-50 transition-colors">
               {headers.map((header) => (
@@ -188,9 +190,9 @@ const AdminDashboard = () => {
       fetcher('getStudents'),
       fetcher('getClasses'),
       fetcher('getSubjects'),
-      fetcher('getMarks'),
-      fetcher('getAttendance'),
-      fetcher('getFees'),
+      fetcher('getStudentMarks'),
+      fetcher('getStudentAttendance'),
+      fetcher('getStudentFees'),
     ]);
     setData({
       Admins: admins.data,
@@ -253,21 +255,21 @@ const TeacherDashboard = () => {
   const [newMark, setNewMark] = useState({ student_id: '', subject_id: '', term: '', score: '' });
 
   const fetchStudents = useCallback(async () => {
-    const response = await fetcher('getStudentsForTeacher', { teacher_id: user.id });
+    const response = await fetcher('getStudents', { teacher_id: user.teacher_id });
     if (response.success) {
       setStudents(response.data);
     }
   }, [user]);
 
   const fetchMarks = useCallback(async () => {
-    const response = await fetcher('getMarksForTeacher', { teacher_id: user.id });
+    const response = await fetcher('getTeacherMarks', { teacher_id: user.teacher_id });
     if (response.success) {
       setMarks(response.data);
     }
   }, [user]);
 
   const fetchAttendance = useCallback(async () => {
-    const response = await fetcher('getAttendanceForTeacher', { teacher_id: user.id });
+    const response = await fetcher('getTeacherAttendance', { teacher_id: user.teacher_id });
     if (response.success) {
       setAttendance(response.data);
     }
@@ -341,21 +343,21 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState('Marks');
 
   const fetchMarks = useCallback(async () => {
-    const response = await fetcher('getStudentMarks', { student_id: user.id });
+    const response = await fetcher('getStudentMarks', { student_id: user.student_id });
     if (response.success) {
       setMarks(response.data);
     }
   }, [user]);
 
   const fetchAttendance = useCallback(async () => {
-    const response = await fetcher('getStudentAttendance', { student_id: user.id });
+    const response = await fetcher('getStudentAttendance', { student_id: user.student_id });
     if (response.success) {
       setAttendance(response.data);
     }
   }, [user]);
 
   const fetchFees = useCallback(async () => {
-    const response = await fetcher('getStudentFees', { student_id: user.id });
+    const response = await fetcher('getStudentFees', { student_id: user.student_id });
     if (response.success) {
       setFees(response.data);
     }
@@ -391,7 +393,7 @@ const StudentDashboard = () => {
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
-            tab
+            {tab}
           </button>
         ))}
       </div>
