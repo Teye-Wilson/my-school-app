@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 
 // The API_URL for your Google Apps Script Web App
 // IMPORTANT: Replace this with your actual deployed script URL
-const API_URL = "https://script.google.com/macros/s/AKfycbwt6HJ87eFTv-UdhvsOqkUBsh72Sy4lR5xAMUDMX06gUfeWLNRyN7657EXzyfXqrHgV/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwgyGxpZAidF2aWGg8hcU2JmTFE69u4j0Hc7J9_KsJ3mLibk6OQ1wg8EWefbpXBWLMm/exec";
 
 // Fetches data from the Google Apps Script API.
 async function fetcher(endpoint, data = {}) {
