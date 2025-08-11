@@ -202,7 +202,7 @@ const AdminDashboard = () => {
       Attendance: attendance.data,
       Fees: fees.data,
     });
-  }, []); // FIX: Wrapped in useCallback with an empty dependency array.
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -257,21 +257,21 @@ const TeacherDashboard = () => {
     if (response.success) {
       setStudents(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   const fetchMarks = useCallback(async () => {
     const response = await fetcher('getMarksForTeacher', { teacher_id: user.id });
     if (response.success) {
       setMarks(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   const fetchAttendance = useCallback(async () => {
     const response = await fetcher('getAttendanceForTeacher', { teacher_id: user.id });
     if (response.success) {
       setAttendance(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
@@ -345,21 +345,21 @@ const StudentDashboard = () => {
     if (response.success) {
       setMarks(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   const fetchAttendance = useCallback(async () => {
     const response = await fetcher('getStudentAttendance', { student_id: user.id });
     if (response.success) {
       setAttendance(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   const fetchFees = useCallback(async () => {
     const response = await fetcher('getStudentFees', { student_id: user.id });
     if (response.success) {
       setFees(response.data);
     }
-  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
+  }, [user]);
 
   useEffect(() => {
     fetchMarks();
@@ -391,7 +391,7 @@ const StudentDashboard = () => {
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
-            {tab}
+            tab
           </button>
         ))}
       </div>
@@ -428,25 +428,26 @@ const HomePage = () => {
   );
 };
 
-export default function App() {
+// New child component to handle the rendering logic
+const AppContent = () => {
   const { role } = useContext(AuthContext);
 
-  const renderAppContent = () => {
-    switch (role) {
-      case 'admin':
-        return <AdminDashboard />;
-      case 'teacher':
-        return <TeacherDashboard />;
-      case 'student':
-        return <StudentDashboard />;
-      default:
-        return <HomePage />;
-    }
-  };
+  switch (role) {
+    case 'admin':
+      return <AdminDashboard />;
+    case 'teacher':
+      return <TeacherDashboard />;
+    case 'student':
+      return <StudentDashboard />;
+    default:
+      return <HomePage />;
+  }
+};
 
+export default function App() {
   return (
     <AuthProvider>
-      {renderAppContent()}
+      <AppContent />
     </AuthProvider>
   );
 }
