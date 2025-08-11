@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 // The API_URL for your Google Apps Script Web App
@@ -93,7 +93,7 @@ const Button = ({ children, onClick }) => (
   </button>
 );
 
-const LoginForm = ({ role, onLogin, onClose }) => {
+const LoginForm = ({ role, onClose }) => {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -181,7 +181,7 @@ const AdminDashboard = () => {
   const [data, setData] = useState({});
   const [activeTab, setActiveTab] = useState('Admins');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const [admins, teachers, students, classes, subjects, marks, attendance, fees] = await Promise.all([
       fetcher('getAdmins'),
       fetcher('getTeachers'),
@@ -202,11 +202,11 @@ const AdminDashboard = () => {
       Attendance: attendance.data,
       Fees: fees.data,
     });
-  };
+  }, []); // FIX: Wrapped in useCallback with an empty dependency array.
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]); // FIX: Added fetchData to the dependency array
+  }, [fetchData]);
 
   const headers = {
     Admins: ['admin_id', 'password', 'name'],
@@ -252,26 +252,26 @@ const TeacherDashboard = () => {
   const [activeTab, setActiveTab] = useState('Students');
   const [newMark, setNewMark] = useState({ student_id: '', subject_id: '', term: '', score: '' });
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     const response = await fetcher('getStudentsForTeacher', { teacher_id: user.id });
     if (response.success) {
       setStudents(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
-  const fetchMarks = async () => {
+  const fetchMarks = useCallback(async () => {
     const response = await fetcher('getMarksForTeacher', { teacher_id: user.id });
     if (response.success) {
       setMarks(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     const response = await fetcher('getAttendanceForTeacher', { teacher_id: user.id });
     if (response.success) {
       setAttendance(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
@@ -284,7 +284,7 @@ const TeacherDashboard = () => {
     fetchStudents();
     fetchMarks();
     fetchAttendance();
-  }, [user, fetchStudents, fetchMarks, fetchAttendance]); // FIX: Added all functions to the dependency array
+  }, [user, fetchStudents, fetchMarks, fetchAttendance]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -308,7 +308,7 @@ const TeacherDashboard = () => {
         );
       case 'Attendance':
         return <Table headers={['attendance_id', 'student_id', 'class_id', 'date', 'status']} data={attendance} />;
-      default: // FIX: Added a default case for the switch statement
+      default:
         return null;
     }
   };
@@ -340,32 +340,32 @@ const StudentDashboard = () => {
   const [fees, setFees] = useState([]);
   const [activeTab, setActiveTab] = useState('Marks');
 
-  const fetchMarks = async () => {
+  const fetchMarks = useCallback(async () => {
     const response = await fetcher('getStudentMarks', { student_id: user.id });
     if (response.success) {
       setMarks(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     const response = await fetcher('getStudentAttendance', { student_id: user.id });
     if (response.success) {
       setAttendance(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
-  const fetchFees = async () => {
+  const fetchFees = useCallback(async () => {
     const response = await fetcher('getStudentFees', { student_id: user.id });
     if (response.success) {
       setFees(response.data);
     }
-  };
+  }, [user]); // FIX: Wrapped in useCallback and included 'user' dependency.
 
   useEffect(() => {
     fetchMarks();
     fetchAttendance();
     fetchFees();
-  }, [user, fetchMarks, fetchAttendance, fetchFees]); // FIX: Added all functions to the dependency array
+  }, [user, fetchMarks, fetchAttendance, fetchFees]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -375,7 +375,7 @@ const StudentDashboard = () => {
         return <Table headers={['attendance_id', 'date', 'status']} data={attendance} />;
       case 'Fees':
         return <Table headers={['fees_id', 'amount', 'status', 'due_date']} data={fees} />;
-      default: // FIX: Added a default case for the switch statement
+      default:
         return null;
     }
   };
