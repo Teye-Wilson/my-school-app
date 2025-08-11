@@ -1,38 +1,47 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
+import { createPortal } from 'react-dom';
 
-// You MUST replace this with your deployed Google Apps Script URL
+// The API_URL for your Google Apps Script Web App
+// IMPORTANT: Replace this with your actual deployed script URL
 const API_URL = "https://script.google.com/macros/s/AKfycbwt6HJ87eFTv-UdhvsOqkUBsh72Sy4lR5xAMUDMX06gUfeWLNRyN7657EXzyfXqrHgV/exec";
 
-const AppContext = createContext(null);
-
-const fetcher = async (action, payload) => {
+// Fetches data from the Google Apps Script API.
+async function fetcher(endpoint, data = {}) {
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(`${API_URL}?endpoint=${endpoint}`, {
       method: 'POST',
-      mode: 'cors',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain',
       },
-      body: JSON.stringify({ action, payload }),
+      body: JSON.stringify(data),
     });
+
+    if (!response.ok) {
+      throw new Error(`API call failed with status: ${response.status}`);
+    }
+
     return await response.json();
   } catch (error) {
-    console.error('API Error:', error);
-    return { success: false, message: 'Failed to connect to the backend.' };
+    console.error(`Error fetching data from endpoint ${endpoint}:`, error);
+    return { error: error.message };
   }
-};
+}
+
+// Auth context to manage user state globally
+const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
 
-  const login = async (role, id, password) => {
-    const response = await fetcher('login', { role, id, password });
+  const login = async (id, password, role) => {
+    const response = await fetcher('login', { id, password, role });
     if (response.success) {
-      setUser(response.user);
+      setUser({ id, name: response.name });
       setRole(role);
+      return true;
     }
-    return response;
+    return false;
   };
 
   const logout = () => {
@@ -40,516 +49,404 @@ const AuthProvider = ({ children }) => {
     setRole(null);
   };
 
-  const value = { user, role, login, logout, fetcher };
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, role, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-const Card = ({ title, description, icon, onClick, color }) => (
+const Modal = ({ children }) => {
+  return createPortal(
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+      {children}
+    </div>,
+    document.body
+  );
+};
+
+const Card = ({ title, onClick }) => (
   <button
     onClick={onClick}
-    className={`p-8 rounded-2xl shadow-xl flex flex-col items-center text-center transition-transform transform hover:scale-105 duration-300
-      ${color === 'purple' ? 'bg-indigo-900 text-white' : 'bg-white text-gray-800'}
-      `}
+    className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 w-full max-w-xs transform hover:scale-105"
   >
-    <div className={`p-4 rounded-full mb-4 ${color === 'purple' ? 'bg-indigo-700' : 'bg-gray-200'}`}>
-      <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-        {icon}
-      </svg>
-    </div>
-    <h3 className="text-2xl font-bold mb-2">{title}</h3>
-    <p className="text-sm opacity-80">{description}</p>
+    <h2 className="text-2xl font-bold text-indigo-900">{title}</h2>
   </button>
 );
 
-const Input = ({ label, type = 'text', value, onChange }) => (
-  <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700">{label}</label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-    />
-  </div>
+const Input = ({ type, placeholder, value, onChange }) => (
+  <input
+    type={type}
+    placeholder={placeholder}
+    value={value}
+    onChange={onChange}
+    className="w-full px-4 py-2 mt-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+  />
 );
 
-const Button = ({ children, onClick, className = '' }) => (
+const Button = ({ children, onClick }) => (
   <button
     onClick={onClick}
-    className={`w-full px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700 transition duration-200 ${className}`}
+    className="w-full px-4 py-2 mt-4 text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-50 transition-colors"
   >
     {children}
   </button>
 );
 
-const Modal = ({ title, children, onClose }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-lg p-6 shadow-lg max-w-md w-full relative">
-      <h2 className="text-2xl font-bold mb-4">{title}</h2>
-      <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-      {children}
-    </div>
-  </div>
-);
-
-const DashboardCard = ({ title, value, children }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md transition-shadow hover:shadow-lg">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-xl font-bold text-gray-700">{title}</h3>
-      {children}
-    </div>
-    <p className="text-4xl font-extrabold text-indigo-600">{value}</p>
-  </div>
-);
-
-const Table = ({ data, columns }) => {
-  if (!data || data.length === 0) {
-    return <p className="text-center text-gray-500">No data available.</p>;
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-lg shadow-md">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            {columns.map(col => (
-              <th key={col.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {data.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {columns.map(col => (
-                <td key={col.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {col.render ? col.render(row) : row[col.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-const LoginForm = ({ role, onLoginSuccess }) => {
-  const { login } = useContext(AppContext);
+const LoginForm = ({ role, onLogin, onClose }) => {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
-    const response = await login(role, id, password);
-    setLoading(false);
-    if (!response.success) {
-      setError(response.message);
-    } else {
-      onLoginSuccess();
+    const success = await login(id, password, role);
+    if (!success) {
+      setError('Invalid ID or password.');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4">
-      <h2 className="text-2xl font-bold mb-4 capitalize">{role} Login</h2>
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      <Input
-        label={`${role.toUpperCase()} ID`}
-        value={id}
-        onChange={(e) => setId(e.target.value)}
-      />
-      <Input
-        label="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <Button type="submit" disabled={loading}>
-        {loading ? 'Logging in...' : 'Login'}
-      </Button>
-    </form>
-  );
-};
-
-const HomePage = ({ onLoginClick }) => {
-  return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-indigo-900 font-sans">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl w-full">
-        <Card
-          title="Admin"
-          description="Login as an administrator to access the dashboard to manage app data."
-          icon={<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />}
-          onClick={() => onLoginClick('admin')}
-          color="purple"
+    <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+      <h2 className="text-3xl font-bold text-center text-indigo-900 mb-6 capitalize">{role} Login</h2>
+      <form onSubmit={handleSubmit}>
+        <Input
+          type="text"
+          placeholder={`${role} ID`}
+          value={id}
+          onChange={(e) => setId(e.target.value)}
         />
-        <Card
-          title="Student"
-          description="Login as a student to explore course materials and assignments."
-          icon={<path d="M12 3L1 9l11 6 11-6-11-6zm0 14.5l-9-4.75V19h18v-6.25l-9 4.75z" />}
-          onClick={() => onLoginClick('student')}
+        <Input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
-        <Card
-          title="Teacher"
-          description="Login as a teacher to create courses, assignments, and track student progress."
-          icon={<path d="M12 12c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />}
-          onClick={() => onLoginClick('teacher')}
-        />
-      </div>
+        {error && <p className="text-red-500 mt-2 text-sm text-center">{error}</p>}
+        <Button onClick={handleSubmit}>Log In</Button>
+      </form>
+      <button onClick={onClose} className="w-full text-center mt-4 text-sm text-indigo-600 hover:text-indigo-800">
+        Close
+      </button>
     </div>
   );
 };
 
+const DashboardHeader = ({ title }) => {
+  const { user, logout } = useContext(AuthContext);
+  return (
+    <header className="bg-white shadow-md p-6 flex justify-between items-center rounded-b-xl">
+      <h1 className="text-4xl font-extrabold text-indigo-900">{title}</h1>
+      <div className="flex items-center space-x-4">
+        <span className="text-lg font-semibold text-indigo-800">Welcome, {user.name}</span>
+        <Button onClick={logout} className="w-auto px-6 py-2">Log Out</Button>
+      </div>
+    </header>
+  );
+};
+
+const Table = ({ headers, data }) => (
+  <div className="overflow-x-auto bg-white rounded-xl shadow-lg mt-6">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-indigo-50">
+        <tr>
+          {headers.map((header) => (
+            <th key={header} className="px-6 py-3 text-left text-xs font-bold text-indigo-800 uppercase tracking-wider">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200">
+        {data.length > 0 ? (
+          data.map((row, index) => (
+            <tr key={index} className="hover:bg-indigo-50 transition-colors">
+              {headers.map((header) => (
+                <td key={header} className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{row[header]}</td>
+              ))}
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={headers.length} className="px-6 py-4 text-center text-sm text-gray-500">No data found.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
 const AdminDashboard = () => {
-  const { user, logout, fetcher } = useContext(AppContext);
-  const [view, setView] = useState('students');
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState({});
+  const [activeTab, setActiveTab] = useState('Admins');
+
+  const fetchData = async () => {
+    const [admins, teachers, students, classes, subjects, marks, attendance, fees] = await Promise.all([
+      fetcher('getAdmins'),
+      fetcher('getTeachers'),
+      fetcher('getStudents'),
+      fetcher('getClasses'),
+      fetcher('getSubjects'),
+      fetcher('getMarks'),
+      fetcher('getAttendance'),
+      fetcher('getFees'),
+    ]);
+    setData({
+      Admins: admins.data,
+      Teachers: teachers.data,
+      Students: students.data,
+      Classes: classes.data,
+      Subjects: subjects.data,
+      Marks: marks.data,
+      Attendance: attendance.data,
+      Fees: fees.data,
+    });
+  };
 
   useEffect(() => {
     fetchData();
-  }, [view]);
+  }, [fetchData]); // FIX: Added fetchData to the dependency array
 
-  const fetchData = async () => {
-    setLoading(true);
-    let action = '';
-    let payload = {};
-    switch (view) {
-      case 'students': action = 'getStudents'; break;
-      case 'teachers': action = 'getTeachers'; break;
-      case 'classes': action = 'getClasses'; break;
-      case 'subjects': action = 'getSubjects'; break;
-    }
-
-    const response = await fetcher(action, payload);
-    if (response.success) {
-      setData(response.data);
-    } else {
-      console.error(response.message);
-    }
-    setLoading(false);
+  const headers = {
+    Admins: ['admin_id', 'password', 'name'],
+    Teachers: ['teacher_id', 'password', 'name', 'email'],
+    Students: ['student_id', 'password', 'name', 'class', 'parent_name', 'phone'],
+    Classes: ['class_id', 'class_name', 'teacher_id', 'subject_ids'],
+    Subjects: ['subject_id', 'subject_name'],
+    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score'],
+    Attendance: ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
+    Fees: ['fees_id', 'student_id', 'amount', 'status', 'due_date'],
   };
-
-  const columns = {
-    students: [
-      { key: 'student_id', label: 'ID' },
-      { key: 'name', label: 'Name' },
-      { key: 'class', label: 'Class' },
-      { key: 'parent_name', label: 'Parent Name' },
-      { key: 'phone', label: 'Phone' },
-    ],
-    teachers: [
-      { key: 'teacher_id', label: 'ID' },
-      { key: 'name', label: 'Name' },
-      { key: 'email', label: 'Email' },
-    ],
-    classes: [
-      { key: 'class_id', label: 'ID' },
-      { key: 'class_name', label: 'Class Name' },
-      { key: 'teacher_id', label: 'Teacher ID' },
-    ],
-    subjects: [
-      { key: 'subject_id', label: 'ID' },
-      { key: 'subject_name', label: 'Subject Name' },
-    ],
-  };
-
-  const menuItems = [
-    { key: 'students', label: 'Students' },
-    { key: 'teachers', label: 'Teachers' },
-    { key: 'classes', label: 'Classes' },
-    { key: 'subjects', label: 'Subjects' },
-  ];
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-indigo-900 text-white p-6 shadow-2xl rounded-tr-3xl rounded-br-3xl">
-        <h1 className="text-3xl font-bold mb-8">Admin Portal</h1>
-        <nav>
-          {menuItems.map(item => (
-            <button
-              key={item.key}
-              onClick={() => setView(item.key)}
-              className={`block w-full text-left py-3 px-4 rounded-lg mb-2 transition-colors duration-200
-                ${view === item.key ? 'bg-indigo-700 font-semibold' : 'hover:bg-indigo-800'}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        <button
-          onClick={logout}
-          className="mt-8 w-full py-2 px-4 bg-red-600 rounded-lg shadow-md hover:bg-red-700 transition duration-200"
-        >
-          Logout
-        </button>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 p-10">
-        <header className="flex justify-between items-center mb-10">
-          <h2 className="text-4xl font-extrabold capitalize">{view} Management</h2>
-          <p className="text-lg">Welcome, {user.name}!</p>
-        </header>
-
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
-          </div>
-        ) : (
-          <Table data={data} columns={columns[view]} />
-        )}
-      </main>
+    <div className="min-h-screen bg-gray-100 p-8">
+      <DashboardHeader title="Admin Dashboard" />
+      <div className="flex justify-center my-6 space-x-2">
+        {Object.keys(headers).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+      {data[activeTab] && (
+        <Table
+          headers={headers[activeTab]}
+          data={data[activeTab]}
+        />
+      )}
     </div>
   );
 };
 
 const TeacherDashboard = () => {
-  const { user, logout, fetcher } = useContext(AppContext);
+  const { user } = useContext(AuthContext);
   const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState(null);
   const [marks, setMarks] = useState([]);
   const [attendance, setAttendance] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('Students');
+  const [newMark, setNewMark] = useState({ student_id: '', subject_id: '', term: '', score: '' });
+
+  const fetchStudents = async () => {
+    const response = await fetcher('getStudentsForTeacher', { teacher_id: user.id });
+    if (response.success) {
+      setStudents(response.data);
+    }
+  };
+
+  const fetchMarks = async () => {
+    const response = await fetcher('getMarksForTeacher', { teacher_id: user.id });
+    if (response.success) {
+      setMarks(response.data);
+    }
+  };
+
+  const fetchAttendance = async () => {
+    const response = await fetcher('getAttendanceForTeacher', { teacher_id: user.id });
+    if (response.success) {
+      setAttendance(response.data);
+    }
+  };
+
+  const handleMarkSubmit = async (e) => {
+    e.preventDefault();
+    await fetcher('addMark', { ...newMark });
+    setNewMark({ student_id: '', subject_id: '', term: '', score: '' });
+    fetchMarks();
+  };
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+    fetchMarks();
+    fetchAttendance();
+  }, [user, fetchStudents, fetchMarks, fetchAttendance]); // FIX: Added all functions to the dependency array
 
-  const fetchStudents = async () => {
-    setLoading(true);
-    const response = await fetcher('getStudents');
-    if (response.success) {
-      setStudents(response.data.filter(s => s.class === 'Class A')); // Filter by teacher's class
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'Students':
+        return <Table headers={['student_id', 'name', 'class']} data={students} />;
+      case 'Marks':
+        return (
+          <>
+            <Table headers={['mark_id', 'student_id', 'subject_id', 'term', 'score']} data={marks} />
+            <div className="bg-white p-6 rounded-xl shadow-lg mt-6">
+              <h3 className="text-xl font-bold mb-4">Add New Mark</h3>
+              <form onSubmit={handleMarkSubmit} className="grid grid-cols-2 gap-4">
+                <Input type="text" placeholder="Student ID" value={newMark.student_id} onChange={(e) => setNewMark({ ...newMark, student_id: e.target.value })} />
+                <Input type="text" placeholder="Subject ID" value={newMark.subject_id} onChange={(e) => setNewMark({ ...newMark, subject_id: e.target.value })} />
+                <Input type="text" placeholder="Term" value={newMark.term} onChange={(e) => setNewMark({ ...newMark, term: e.target.value })} />
+                <Input type="number" placeholder="Score" value={newMark.score} onChange={(e) => setNewMark({ ...newMark, score: e.target.value })} />
+                <Button onClick={handleMarkSubmit}>Add Mark</Button>
+              </form>
+            </div>
+          </>
+        );
+      case 'Attendance':
+        return <Table headers={['attendance_id', 'student_id', 'class_id', 'date', 'status']} data={attendance} />;
+      default: // FIX: Added a default case for the switch statement
+        return null;
     }
-    setLoading(false);
   };
-
-  const fetchStudentData = async (student_id) => {
-    setLoading(true);
-    const [marksResponse, attendanceResponse] = await Promise.all([
-      fetcher('getStudentMarks', { student_id }),
-      fetcher('getStudentAttendance', { student_id, class_id: 'class_a' })
-    ]);
-    if (marksResponse.success) setMarks(marksResponse.data);
-    if (attendanceResponse.success) setAttendance(attendanceResponse.data);
-    setLoading(false);
-  };
-
-  const handleSelectStudent = (student) => {
-    setSelectedStudent(student);
-    fetchStudentData(student.student_id);
-  };
-
-  const handleAddMark = async (e) => {
-    e.preventDefault();
-    const newMark = {
-      student_id: selectedStudent.student_id,
-      subject_id: e.target.subject.value,
-      term: e.target.term.value,
-      score: e.target.score.value,
-    };
-    await fetcher('addMark', newMark);
-    fetchStudentData(selectedStudent.student_id);
-  };
-
-  const handleAddAttendance = async (e) => {
-    e.preventDefault();
-    const newAttendance = {
-      student_id: selectedStudent.student_id,
-      class_id: 'class_a', // Example
-      date: new Date().toLocaleDateString(),
-      status: e.target.status.value,
-    };
-    await fetcher('addAttendance', newAttendance);
-    fetchStudentData(selectedStudent.student_id);
-  };
-
-  const marksColumns = [
-    { key: 'subject_id', label: 'Subject' },
-    { key: 'term', label: 'Term' },
-    { key: 'score', label: 'Score' },
-  ];
-
-  const attendanceColumns = [
-    { key: 'date', label: 'Date' },
-    { key: 'status', label: 'Status' },
-  ];
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800 p-10">
-      <header className="flex justify-between items-center mb-10">
-        <h1 className="text-4xl font-extrabold">Teacher Portal</h1>
-        <p className="text-lg">Welcome, {user.name}!</p>
-        <button
-          onClick={logout}
-          className="py-2 px-4 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-200"
-        >
-          Logout
-        </button>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="bg-white p-6 rounded-2xl shadow-md col-span-1">
-          <h2 className="text-2xl font-bold mb-4">My Students</h2>
-          <ul className="space-y-2">
-            {students.map(student => (
-              <li
-                key={student.student_id}
-                onClick={() => handleSelectStudent(student)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors duration-200
-                  ${selectedStudent?.student_id === student.student_id ? 'bg-indigo-100 font-semibold' : 'hover:bg-gray-50'}`}
-              >
-                {student.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {selectedStudent && (
-          <div className="bg-white p-6 rounded-2xl shadow-md col-span-2">
-            <h2 className="text-2xl font-bold mb-4">Actions for {selectedStudent.name}</h2>
-
-            {/* Add Mark Form */}
-            <h3 className="text-xl font-semibold mb-2">Add Mark</h3>
-            <form onSubmit={handleAddMark} className="mb-6 flex space-x-4">
-              <Input label="Subject" name="subject" />
-              <Input label="Term" name="term" />
-              <Input label="Score" name="score" type="number" />
-              <Button type="submit" className="w-auto self-end">Add Mark</Button>
-            </form>
-            <Table data={marks} columns={marksColumns} />
-
-            {/* Add Attendance Form */}
-            <h3 className="text-xl font-semibold mb-2 mt-6">Add Attendance</h3>
-            <form onSubmit={handleAddAttendance} className="flex space-x-4">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select name="status" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                  <option value="Present">Present</option>
-                  <option value="Absent">Absent</option>
-                </select>
-              </div>
-              <Button type="submit" className="w-auto self-end">Mark Attendance</Button>
-            </form>
-            <Table data={attendance} columns={attendanceColumns} />
-          </div>
-        )}
+    <div className="min-h-screen bg-gray-100 p-8">
+      <DashboardHeader title="Teacher Dashboard" />
+      <div className="flex justify-center my-6 space-x-2">
+        {['Students', 'Marks', 'Attendance'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
+      {renderContent()}
     </div>
   );
 };
 
 const StudentDashboard = () => {
-  const { user, logout, fetcher } = useContext(AppContext);
+  const { user } = useContext(AuthContext);
   const [marks, setMarks] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchMarks();
-  }, []);
+  const [attendance, setAttendance] = useState([]);
+  const [fees, setFees] = useState([]);
+  const [activeTab, setActiveTab] = useState('Marks');
 
   const fetchMarks = async () => {
-    setLoading(true);
-    const response = await fetcher('getStudentMarks', { student_id: user.student_id });
+    const response = await fetcher('getStudentMarks', { student_id: user.id });
     if (response.success) {
       setMarks(response.data);
     }
-    setLoading(false);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const fetchAttendance = async () => {
+    const response = await fetcher('getStudentAttendance', { student_id: user.id });
+    if (response.success) {
+      setAttendance(response.data);
+    }
   };
 
-  const marksColumns = [
-    { key: 'subject_id', label: 'Subject' },
-    { key: 'term', label: 'Term' },
-    { key: 'score', label: 'Score' },
-  ];
+  const fetchFees = async () => {
+    const response = await fetcher('getStudentFees', { student_id: user.id });
+    if (response.success) {
+      setFees(response.data);
+    }
+  };
+
+  useEffect(() => {
+    fetchMarks();
+    fetchAttendance();
+    fetchFees();
+  }, [user, fetchMarks, fetchAttendance, fetchFees]); // FIX: Added all functions to the dependency array
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'Marks':
+        return <Table headers={['mark_id', 'subject_id', 'term', 'score']} data={marks} />;
+      case 'Attendance':
+        return <Table headers={['attendance_id', 'date', 'status']} data={attendance} />;
+      case 'Fees':
+        return <Table headers={['fees_id', 'amount', 'status', 'due_date']} data={fees} />;
+      default: // FIX: Added a default case for the switch statement
+        return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800 p-10">
-      <header className="flex justify-between items-center mb-10">
-        <h1 className="text-4xl font-extrabold">Student Portal</h1>
-        <div className="flex space-x-4">
-          <p className="text-lg">Welcome, {user.name}!</p>
+    <div className="min-h-screen bg-gray-100 p-8">
+      <DashboardHeader title="Student Dashboard" />
+      <div className="flex justify-center my-6 space-x-2">
+        {['Marks', 'Attendance', 'Fees'].map((tab) => (
           <button
-            onClick={logout}
-            className="py-2 px-4 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-200"
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
           >
-            Logout
+            {tab}
           </button>
-        </div>
-      </header>
-
-      <div className="bg-white p-6 rounded-2xl shadow-md">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">My Results</h2>
-          <Button onClick={handlePrint} className="w-auto">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zM9 13v6" />
-            </svg>
-            Print
-          </Button>
-        </div>
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
-          </div>
-        ) : (
-          <Table data={marks} columns={marksColumns} />
-        )}
+        ))}
       </div>
+      {renderContent()}
     </div>
   );
 };
 
-const App = () => {
+const HomePage = () => {
   const [loginRole, setLoginRole] = useState(null);
-  const { role } = useContext(AppContext);
 
-  let content;
-  if (role === 'admin') {
-    content = <AdminDashboard />;
-  } else if (role === 'teacher') {
-    content = <TeacherDashboard />;
-  } else if (role === 'student') {
-    content = <StudentDashboard />;
-  } else if (loginRole) {
-    content = (
-      <div className="min-h-screen flex items-center justify-center p-8 bg-indigo-900 font-sans">
-        <Modal title={`${loginRole} Login`} onClose={() => setLoginRole(null)}>
-          <LoginForm role={loginRole} onLoginSuccess={() => setLoginRole(null)} />
-        </Modal>
-      </div>
-    );
-  } else {
-    content = <HomePage onLoginClick={setLoginRole} />;
-  }
+  const handleCardClick = (role) => {
+    setLoginRole(role);
+  };
+
+  const handleCloseModal = () => {
+    setLoginRole(null);
+  };
 
   return (
-    <div className="font-sans antialiased text-gray-800">
-      {content}
+    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+      <h1 className="text-5xl font-extrabold text-white mb-10">School Management System</h1>
+      <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
+        <Card title="Admin" onClick={() => handleCardClick('admin')} />
+        <Card title="Teacher" onClick={() => handleCardClick('teacher')} />
+        <Card title="Student" onClick={() => handleCardClick('student')} />
+      </div>
+      {loginRole && (
+        <Modal>
+          <LoginForm role={loginRole} onClose={handleCloseModal} />
+        </Modal>
+      )}
     </div>
   );
 };
 
-export default function Root() {
+export default function App() {
+  const { role } = useContext(AuthContext);
+
+  const renderAppContent = () => {
+    switch (role) {
+      case 'admin':
+        return <AdminDashboard />;
+      case 'teacher':
+        return <TeacherDashboard />;
+      case 'student':
+        return <StudentDashboard />;
+      default:
+        return <HomePage />;
+    }
+  };
+
   return (
     <AuthProvider>
-      <App />
+      {renderAppContent()}
     </AuthProvider>
   );
 }
