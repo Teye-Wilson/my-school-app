@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
