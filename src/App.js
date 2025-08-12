@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 // The API_URL for your Google Apps Script Web App
-const API_URL = "https://script.google.com/macros/s/AKfycbyZqM4x67pxr_CY_G1aAX07WUBBCnzHsnmSCnDlTF9oSMcCLq6XUOu1nJN5HlSOGWql/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwUOlzf-qGboxB0VL2srsMEkMFO9rs6OmsScYlYVSwZ-OvafUVp0WzbJFQ40bOPiC6E/exec";
 
 // Auth context to manage user state globally
 const AuthContext = createContext();
@@ -130,7 +130,7 @@ const Table = ({ headers, data, onEdit, onDelete, idKey }) => (
                     </IconButton>
                   )}
                   {onDelete && (
-                    <IconButton onClick={() => onDelete(row[idKey])} className="ml-2">
+                    <IconButton onClick={() => onDelete(row)} className="ml-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1H9a1 1 0 00-1 1v3m0 0h8"></path></svg>
                     </IconButton>
                   )}
@@ -214,27 +214,29 @@ const AdminDashboard = ({ activeTab }) => {
   const [courses, setCourses] = useState([]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [students, setStudents] = useState([]);
 
   const headers = {
-    Students: ['student_id', 'name', 'password', 'course_id', 'class_id'],
+    Students: ['student_id', 'name', 'password', 'course_name', 'class_name'],
     Teachers: ['teacher_id', 'name', 'password', 'email'],
-    Courses: ['course_id', 'course_name'],
-    Classes: ['class_id', 'class_name', 'course_id', 'teacher_id'],
-    Subjects: ['subject_id', 'subject_name', 'teacher_id', 'class_id'],
-    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score', 'semester'],
-    Attendance: ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
-    Fees: ['fees_id', 'student_id', 'amount', 'status', 'due_date'],
+    Courses: ['course_name'],
+    Classes: ['class_name', 'course_name', 'teacher_name'],
+    Subjects: ['subject_name', 'teacher_name', 'class_name'],
+    Marks: ['student_name', 'subject_name', 'term', 'score', 'semester'],
+    Attendance: ['student_name', 'class_name', 'date', 'status'],
+    Fees: ['student_name', 'amount', 'status', 'due_date'],
   };
 
   const idKeys = {
     Students: 'student_id',
     Teachers: 'teacher_id',
-    Courses: 'course_id',
-    Classes: 'class_id',
-    Subjects: 'subject_id',
-    Marks: 'mark_id',
-    Attendance: 'attendance_id',
-    Fees: 'fees_id',
+    Courses: 'course_name',
+    Classes: 'class_name',
+    Subjects: 'subject_name',
+    Marks: 'student_name',
+    Attendance: 'student_name',
+    Fees: 'student_name',
   };
 
   const fetchData = useCallback(async () => {
@@ -261,9 +263,11 @@ const AdminDashboard = ({ activeTab }) => {
       Attendance: attendanceRes.data,
       Fees: feesRes.data,
     });
+    setStudents(studentsRes.data);
     setCourses(coursesRes.data);
     setClasses(classesRes.data);
     setTeachers(teachersRes.data);
+    setSubjects(subjectsRes.data);
     setMessage('');
   }, []);
 
@@ -274,6 +278,7 @@ const AdminDashboard = ({ activeTab }) => {
   const handleAddEdit = async (e) => {
     e.preventDefault();
     const action = isEditMode ? `update${activeTab.slice(0, -1)}` : `add${activeTab.slice(0, -1)}`;
+
     const response = await fetcher(action, formData);
     if (response.success) {
       setMessage(`Successfully ${isEditMode ? 'updated' : 'added'}!`);
@@ -292,10 +297,11 @@ const AdminDashboard = ({ activeTab }) => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (row) => {
     if (window.confirm('Are you sure you want to delete this entry?')) {
       const action = `delete${activeTab.slice(0, -1)}`;
-      const response = await fetcher(action, { [idKeys[activeTab]]: id });
+      const payload = { ...row };
+      const response = await fetcher(action, payload);
       if (response.success) {
         setMessage('Successfully deleted!');
         fetchData();
@@ -307,172 +313,135 @@ const AdminDashboard = ({ activeTab }) => {
 
   const renderForm = () => {
     const formTitle = isEditMode ? `Edit ${activeTab.slice(0, -1)}` : `Add New ${activeTab.slice(0, -1)}`;
-    const isAddingClass = activeTab === 'Classes';
-    const isAddingSubject = activeTab === 'Subjects';
-    const isAddingStudent = activeTab === 'Students';
+
+    const formInputs = {
+      Students: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Name</label>
+          <Input type="text" placeholder="Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Password</label>
+          <Input type="password" placeholder="Password" value={formData.password || ''} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Course Name</label>
+          <Select value={formData.course_name || ''} onChange={(e) => setFormData({ ...formData, course_name: e.target.value })}>
+            <option value="">Select Course</option>
+            {courses.map(course => <option key={course.course_name} value={course.course_name}>{course.course_name}</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Class Name</label>
+          <Select value={formData.class_name || ''} onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}>
+            <option value="">Select Class</option>
+            {classes.map(cls => <option key={cls.class_name} value={cls.class_name}>{cls.class_name}</option>)}
+          </Select>
+        </>
+      ),
+      Teachers: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Name</label>
+          <Input type="text" placeholder="Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Password</label>
+          <Input type="password" placeholder="Password" value={formData.password || ''} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Email</label>
+          <Input type="email" placeholder="Email" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+        </>
+      ),
+      Courses: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Course Name</label>
+          <Input type="text" placeholder="Course Name" value={formData.course_name || ''} onChange={(e) => setFormData({ ...formData, course_name: e.target.value })} />
+        </>
+      ),
+      Classes: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Class Name</label>
+          <Input type="text" placeholder="Class Name" value={formData.class_name || ''} onChange={(e) => setFormData({ ...formData, class_name: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Course Name</label>
+          <Select value={formData.course_name || ''} onChange={(e) => setFormData({ ...formData, course_name: e.target.value })}>
+            <option value="">Select Course</option>
+            {courses.map(course => <option key={course.course_name} value={course.course_name}>{course.course_name}</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Teacher Name</label>
+          <Select value={formData.teacher_name || ''} onChange={(e) => setFormData({ ...formData, teacher_name: e.target.value })}>
+            <option value="">Select Teacher</option>
+            {teachers.map(teacher => <option key={teacher.name} value={teacher.name}>{teacher.name}</option>)}
+          </Select>
+        </>
+      ),
+      Subjects: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Subject Name</label>
+          <Input type="text" placeholder="Subject Name" value={formData.subject_name || ''} onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Teacher Name</label>
+          <Select value={formData.teacher_name || ''} onChange={(e) => setFormData({ ...formData, teacher_name: e.target.value })}>
+            <option value="">Select Teacher</option>
+            {teachers.map(teacher => <option key={teacher.name} value={teacher.name}>{teacher.name}</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Class Name</label>
+          <Select value={formData.class_name || ''} onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}>
+            <option value="">Select Class</option>
+            {classes.map(cls => <option key={cls.class_name} value={cls.class_name}>{cls.class_name}</option>)}
+          </Select>
+        </>
+      ),
+      Marks: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Student Name</label>
+          <Select value={formData.student_name || ''} onChange={(e) => setFormData({ ...formData, student_name: e.target.value })}>
+            <option value="">Select Student</option>
+            {students.map(student => <option key={student.name} value={student.name}>{student.name} ({student.student_id})</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Subject Name</label>
+          <Select value={formData.subject_name || ''} onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}>
+            <option value="">Select Subject</option>
+            {subjects.map(subject => <option key={subject.subject_name} value={subject.subject_name}>{subject.subject_name}</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Term</label>
+          <Input type="text" placeholder="Term" value={formData.term || ''} onChange={(e) => setFormData({ ...formData, term: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Score</label>
+          <Input type="number" placeholder="Score" value={formData.score || ''} onChange={(e) => setFormData({ ...formData, score: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Semester</label>
+          <Input type="number" placeholder="Semester" value={formData.semester || ''} onChange={(e) => setFormData({ ...formData, semester: e.target.value })} />
+        </>
+      ),
+      Attendance: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Student Name</label>
+          <Select value={formData.student_name || ''} onChange={(e) => setFormData({ ...formData, student_name: e.target.value })}>
+            <option value="">Select Student</option>
+            {students.map(student => <option key={student.name} value={student.name}>{student.name} ({student.student_id})</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Class Name</label>
+          <Select value={formData.class_name || ''} onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}>
+            <option value="">Select Class</option>
+            {classes.map(cls => <option key={cls.class_name} value={cls.class_name}>{cls.class_name}</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Date</label>
+          <Input type="date" placeholder="Date" value={formData.date || ''} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Status</label>
+          <Input type="text" placeholder="Status (e.g., Present, Absent)" value={formData.status || ''} onChange={(e) => setFormData({ ...formData, status: e.target.value })} />
+        </>
+      ),
+      Fees: (
+        <>
+          <label className="block text-gray-700 text-sm font-bold mb-2">Student Name</label>
+          <Select value={formData.student_name || ''} onChange={(e) => setFormData({ ...formData, student_name: e.target.value })}>
+            <option value="">Select Student</option>
+            {students.map(student => <option key={student.name} value={student.name}>{student.name} ({student.student_id})</option>)}
+          </Select>
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Amount</label>
+          <Input type="number" placeholder="Amount" value={formData.amount || ''} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Status</label>
+          <Input type="text" placeholder="Status (e.g., Paid, Pending)" value={formData.status || ''} onChange={(e) => setFormData({ ...formData, status: e.target.value })} />
+          <label className="block text-gray-700 text-sm font-bold mb-2 mt-4">Due Date</label>
+          <Input type="date" placeholder="Due Date" value={formData.due_date || ''} onChange={(e) => setFormData({ ...formData, due_date: e.target.value })} />
+        </>
+      ),
+    };
 
     return (
       <Modal>
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
           <h2 className="text-2xl font-bold mb-4">{formTitle}</h2>
           <form onSubmit={handleAddEdit}>
-            {isAddingClass && (
-              <>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Class ID</label>
-                  <Input
-                    type="text"
-                    placeholder="class_id"
-                    value={formData.class_id || ''}
-                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Class Name</label>
-                  <Input
-                    type="text"
-                    placeholder="class_name"
-                    value={formData.class_name || ''}
-                    onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Course</label>
-                  <Select
-                    value={formData.course_id || ''}
-                    onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map(course => (
-                      <option key={course.course_id} value={course.course_id}>
-                        {course.course_name} ({course.course_id})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </>
-            )}
-            {isAddingSubject && (
-              <>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Subject ID</label>
-                  <Input
-                    type="text"
-                    placeholder="subject_id"
-                    value={formData.subject_id || ''}
-                    onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Subject Name</label>
-                  <Input
-                    type="text"
-                    placeholder="subject_name"
-                    value={formData.subject_name || ''}
-                    onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Teacher</label>
-                  <Select
-                    value={formData.teacher_id || ''}
-                    onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })}
-                  >
-                    <option value="">Select Teacher</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher.teacher_id} value={teacher.teacher_id}>
-                        {teacher.name} ({teacher.teacher_id})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
-                  <Select
-                    value={formData.class_id || ''}
-                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                  >
-                    <option value="">Select Class</option>
-                    {classes.map(classItem => (
-                      <option key={classItem.class_id} value={classItem.class_id}>
-                        {classItem.class_name} ({classItem.class_id})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </>
-            )}
-            {isAddingStudent && (
-              <>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Student ID</label>
-                  <Input
-                    type="text"
-                    placeholder="student_id"
-                    value={formData.student_id || ''}
-                    onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Name</label>
-                  <Input
-                    type="text"
-                    placeholder="name"
-                    value={formData.name || ''}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Password</label>
-                  <Input
-                    type="password"
-                    placeholder="password"
-                    value={formData.password || ''}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Course</label>
-                  <Select
-                    value={formData.course_id || ''}
-                    onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
-                  >
-                    <option value="">Select Course</option>
-                    {courses.map(course => (
-                      <option key={course.course_id} value={course.course_id}>
-                        {course.course_name} ({course.course_id})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
-                  <Select
-                    value={formData.class_id || ''}
-                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                  >
-                    <option value="">Select Class</option>
-                    {classes.map(classItem => (
-                      <option key={classItem.class_id} value={classItem.class_id}>
-                        {classItem.class_name} ({classItem.class_id})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </>
-            )}
-            {/* For other tables, just use standard inputs */}
-            {!(isAddingClass || isAddingSubject || isAddingStudent) && headers[activeTab].filter(h => h !== idKeys[activeTab]).map(header => (
-              <div key={header} className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">{header.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</label>
-                <Input
-                  type="text"
-                  placeholder={header.replace('_', ' ')}
-                  value={formData[header] || ''}
-                  onChange={(e) => setFormData({ ...formData, [header]: e.target.value })}
-                />
-              </div>
-            ))}
+            {formInputs[activeTab]}
             <div className="flex justify-end space-x-4 mt-4">
               <Button onClick={() => { setShowForm(false); setFormData({}); setIsEditMode(false); }} className="bg-gray-400 hover:bg-gray-500">Cancel</Button>
               <Button onClick={handleAddEdit}>{isEditMode ? 'Update' : 'Add'}</Button>
@@ -488,11 +457,9 @@ const AdminDashboard = ({ activeTab }) => {
       <Header title="Admin Dashboard" />
       {message && <div className="text-center my-4 text-lg font-semibold text-indigo-600">{message}</div>}
       <div className="flex justify-end my-4">
-        {['Students', 'Teachers', 'Courses', 'Classes', 'Subjects'].includes(activeTab) && (
-          <Button onClick={() => { setShowForm(true); setIsEditMode(false); setFormData({}); }} className="w-auto px-6 py-2">
-            Add New {activeTab.slice(0, -1)}
-          </Button>
-        )}
+        <Button onClick={() => { setShowForm(true); setIsEditMode(false); setFormData({}); }} className="w-auto px-6 py-2">
+          Add New {activeTab.slice(0, -1)}
+        </Button>
       </div>
       {data[activeTab] && (
         <Table
@@ -508,25 +475,24 @@ const AdminDashboard = ({ activeTab }) => {
   );
 };
 
-
 const TeacherDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
   const [message, setMessage] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSubjectName, setSelectedSubjectName] = useState('');
+  const [selectedClassName, setSelectedClassName] = useState('');
   const [marksToSubmit, setMarksToSubmit] = useState({});
 
   const headers = {
-    'My Students': ['student_id', 'name', 'course_id', 'class_id'],
-    'Marks': ['mark_id', 'student_id', 'subject_id', 'term', 'score', 'semester'],
-    'Attendance': ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
+    'My Students': ['student_id', 'name', 'course_name', 'class_name'],
+    'Marks': ['student_name', 'subject_name', 'term', 'score', 'semester'],
+    'Attendance': ['student_name', 'class_name', 'date', 'status'],
   };
-  const idKeys = { 'Marks': 'mark_id', 'Attendance': 'attendance_id' };
+  const idKeys = {};
 
   const fetchData = useCallback(async () => {
     setMessage('Loading data...');
-    const response = await fetcher('getTeacherData', { teacher_id: user.teacher_id });
+    const response = await fetcher('getTeacherData', { teacher_name: user.name });
     if (response.success) {
       setData({
         'My Students': response.data.students,
@@ -540,15 +506,15 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
   }, [user]);
 
   useEffect(() => {
-    if (user && user.teacher_id) {
+    if (user && user.name) {
       fetchData();
     }
   }, [user, fetchData]);
 
-  const handleMarkChange = (studentId, value) => {
+  const handleMarkChange = (studentName, value) => {
     setMarksToSubmit(prev => ({
       ...prev,
-      [studentId]: {
+      [studentName]: {
         score: value,
         term: 'Term 1', // Assuming a single term for simplicity
         semester: 1, // Assuming semester 1 for simplicity
@@ -558,43 +524,30 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
 
   const handleSubmitMarks = async () => {
     setMessage('Submitting marks...');
-    const marksPayload = Object.keys(marksToSubmit).map(student_id => ({
-      student_id,
-      subject_id: selectedSubject,
-      score: marksToSubmit[student_id].score,
-      term: marksToSubmit[student_id].term,
-      semester: marksToSubmit[student_id].semester,
+    const marksPayload = Object.keys(marksToSubmit).map(student_name => ({
+      student_name,
+      subject_name: selectedSubjectName,
+      score: marksToSubmit[student_name].score,
+      term: marksToSubmit[student_name].term,
+      semester: marksToSubmit[student_name].semester,
     }));
 
     const response = await fetcher('addMultipleMarks', { marks: marksPayload });
     if (response.success) {
       setMessage('Marks submitted successfully!');
       setMarksToSubmit({});
-      setSelectedClass('');
-      setSelectedSubject('');
+      setSelectedClassName('');
+      setSelectedSubjectName('');
       fetchData();
     } else {
       setMessage(`Error: ${response.message}`);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this entry?')) {
-      const action = `delete${activeTab.slice(0, -1)}`;
-      const response = await fetcher(action, { [idKeys[activeTab]]: id });
-      if (response.success) {
-        setMessage('Successfully deleted!');
-        fetchData();
-      } else {
-        setMessage(`Error: ${response.message}`);
-      }
-    }
-  };
-
   const renderEnterMarksForm = () => {
     const filteredStudents = data['My Students']?.filter(student =>
-      student.class_id === selectedClass &&
-      data['Subjects']?.some(subject => subject.subject_id === selectedSubject && subject.class_id === selectedClass)
+      student.class_name === selectedClassName &&
+      data['Subjects']?.some(subject => subject.subject_name === selectedSubjectName && subject.class_name === selectedClassName)
     ) || [];
 
     return (
@@ -603,30 +556,30 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-gray-700 text-sm font-bold mb-2">Subject</label>
-            <Select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+            <Select value={selectedSubjectName} onChange={(e) => setSelectedSubjectName(e.target.value)}>
               <option value="">Select Subject</option>
               {data['Subjects']?.map(subject => (
-                <option key={subject.subject_id} value={subject.subject_id}>
-                  {subject.subject_name} ({subject.subject_id})
+                <option key={subject.subject_name} value={subject.subject_name}>
+                  {subject.subject_name}
                 </option>
               ))}
             </Select>
           </div>
           <div>
             <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
-            <Select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} disabled={!selectedSubject}>
+            <Select value={selectedClassName} onChange={(e) => setSelectedClassName(e.target.value)} disabled={!selectedSubjectName}>
               <option value="">Select Class</option>
-              {data['Classes']?.filter(cls => data['Subjects']?.some(sub => sub.class_id === cls.class_id && sub.subject_id === selectedSubject)).map(classItem => (
-                <option key={classItem.class_id} value={classItem.class_id}>
-                  {classItem.class_name} ({classItem.class_id})
+              {data['Classes']?.filter(cls => data['Subjects']?.some(sub => sub.class_name === cls.class_name && sub.subject_name === selectedSubjectName)).map(classItem => (
+                <option key={classItem.class_name} value={classItem.class_name}>
+                  {classItem.class_name}
                 </option>
               ))}
             </Select>
           </div>
         </div>
-        {selectedSubject && selectedClass && (
+        {selectedSubjectName && selectedClassName && (
           <div className="mt-6">
-            <h4 className="text-xl font-semibold mb-4">Students in {data['Classes']?.find(c => c.class_id === selectedClass)?.class_name} doing {data['Subjects']?.find(s => s.subject_id === selectedSubject)?.subject_name}</h4>
+            <h4 className="text-xl font-semibold mb-4">Students in {selectedClassName} doing {selectedSubjectName}</h4>
             {filteredStudents.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -638,14 +591,14 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredStudents.map(student => (
-                      <tr key={student.student_id}>
+                      <tr key={student.name}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <Input
                             type="number"
                             placeholder="Score"
-                            value={marksToSubmit[student.student_id]?.score || ''}
-                            onChange={(e) => handleMarkChange(student.student_id, e.target.value)}
+                            value={marksToSubmit[student.name]?.score || ''}
+                            onChange={(e) => handleMarkChange(student.name, e.target.value)}
                           />
                         </td>
                       </tr>
@@ -694,13 +647,14 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
         <Table
           headers={headers[activeTab]}
           data={data[activeTab]}
-          onDelete={idKeys[activeTab] ? handleDelete : null}
-          idKey={idKeys[activeTab]}
+          onDelete={null} // Deletes are not supported for these tables in this new scheme
+          idKey={null}
         />
       )}
     </div>
   );
 };
+
 
 const StudentDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
@@ -709,17 +663,17 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
   const [selectedSemester, setSelectedSemester] = useState('');
 
   const headers = {
-    'My Marks': ['mark_id', 'subject_id', 'term', 'score', 'semester'],
-    'My Attendance': ['attendance_id', 'date', 'status'],
-    'My Fees': ['fees_id', 'amount', 'status', 'due_date'],
+    'My Marks': ['subject_name', 'term', 'score', 'semester'],
+    'My Attendance': ['class_name', 'date', 'status'],
+    'My Fees': ['amount', 'status', 'due_date'],
   };
 
   const fetchData = useCallback(async () => {
     setMessage('Loading data...');
     const [marksRes, attendanceRes, feesRes] = await Promise.all([
-      fetcher('getStudentMarks', { student_id: user.student_id }),
-      fetcher('getStudentAttendance', { student_id: user.student_id }),
-      fetcher('getStudentFees', { student_id: user.student_id }),
+      fetcher('getStudentMarks', { student_name: user.name }),
+      fetcher('getStudentAttendance', { student_name: user.name }),
+      fetcher('getStudentFees', { student_name: user.name }),
     ]);
     setData({
       'My Marks': marksRes.data,
@@ -731,7 +685,7 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
 
   const generatePdf = async () => {
     setMessage('Generating report card...');
-    const res = await fetcher('getReportCardData', { student_id: user.student_id });
+    const res = await fetcher('getReportCardData', { student_name: user.name });
     if (res.success) {
       const doc = new jsPDF('p', 'mm', 'a4');
       const student = res.data.student;
@@ -745,11 +699,11 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
       doc.setFontSize(12);
       doc.text(`Name of Student: ${student.name}`, 20, 50);
       doc.text(`Student ID: ${student.student_id}`, 20, 57);
-      doc.text(`Course: ${student.course_id}`, 20, 64);
-      doc.text(`Class: ${student.class_id}`, 20, 71);
+      doc.text(`Course: ${student.course_name}`, 20, 64);
+      doc.text(`Class: ${student.class_name}`, 20, 71);
 
       const tableColumn = ["SUBJECT", "CLASS SCORE (30%)", "EXAM SCORE (70%)", "TOTAL (100%)", "GRADE", "REMARKS", "SEMESTER"];
-      const tableRows = marks.map(m => [m.subject_id, '', '', m.score, m.grade, m.remarks, m.semester]);
+      const tableRows = marks.map(m => [m.subject_name, '', '', m.score, m.grade, m.remarks, m.semester]);
 
       doc.autoTable({
         startY: 80,
@@ -757,7 +711,7 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
         body: tableRows,
       });
 
-      doc.save(`ReportCard_${student.student_id}.pdf`);
+      doc.save(`ReportCard_${student.name}.pdf`);
       setMessage('Report card generated successfully!');
     } else {
       setMessage(`Error generating report card: ${res.message}`);
@@ -765,13 +719,13 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
   };
 
   useEffect(() => {
-    if (user && user.student_id) {
+    if (user && user.name) {
       fetchData();
     }
   }, [user, fetchData]);
 
   const filteredMarks = selectedSemester
-    ? data['My Marks'].filter(mark => String(mark.semester) === selectedSemester)
+    ? data['My Marks']?.filter(mark => String(mark.semester) === selectedSemester)
     : data['My Marks'];
 
   const renderContent = () => {
