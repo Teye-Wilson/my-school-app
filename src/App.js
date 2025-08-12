@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 // The API_URL for your Google Apps Script Web App
-const API_URL = "https://script.google.com/macros/s/AKfycbyHgkAtQZfAz-QL2SzdM5OEcOIt1CUPoLhoiv9Nyvyb35Ec6VVP1yiWEvyP0NnC5eO5/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxcIlfxcvgXfvpi26TfPeaepa3mKXy8flCtovcSycDrQI6tHIbnanF6p4QPWaETRMum/exec";
 
 // Auth context to manage user state globally
 const AuthContext = createContext();
@@ -73,6 +73,16 @@ const Input = ({ type, placeholder, value, onChange }) => (
     onChange={onChange}
     className="w-full px-4 py-2 mt-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
   />
+);
+
+const Select = ({ children, value, onChange, className = '' }) => (
+  <select
+    value={value}
+    onChange={onChange}
+    className={`w-full px-4 py-2 mt-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 ${className}`}
+  >
+    {children}
+  </select>
 );
 
 const Button = ({ children, onClick, className = '' }) => (
@@ -192,7 +202,7 @@ const Header = ({ title }) => {
   );
 };
 
-const AdminDashboard = ({ activeTab, onTabChange }) => {
+const AdminDashboard = ({ activeTab }) => {
   const [data, setData] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({});
@@ -205,7 +215,7 @@ const AdminDashboard = ({ activeTab, onTabChange }) => {
     Courses: ['course_id', 'course_name'],
     Classes: ['class_id', 'class_name', 'course_id', 'teacher_id'],
     Subjects: ['subject_id', 'subject_name', 'teacher_id', 'class_id'],
-    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score'],
+    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score', 'semester'],
     Attendance: ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
     Fees: ['fees_id', 'student_id', 'amount', 'status', 'due_date'],
   };
@@ -351,7 +361,7 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
 
   const headers = {
     'My Students': ['student_id', 'name', 'course_id', 'class_id'],
-    'Marks': ['mark_id', 'student_id', 'subject_id', 'term', 'score'],
+    'Marks': ['mark_id', 'student_id', 'subject_id', 'term', 'score', 'semester'],
     'Attendance': ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
   };
   const idKeys = { 'Marks': 'mark_id', 'Attendance': 'attendance_id' };
@@ -441,6 +451,14 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
                 <Input type="text" placeholder="Term" value={newMark.term || ''} onChange={(e) => setNewMark({ ...newMark, term: e.target.value })} />
               </div>
               <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">Semester</label>
+                <Select value={newMark.semester || ''} onChange={(e) => setNewMark({ ...newMark, semester: e.target.value })}>
+                  <option value="" disabled>Select Semester</option>
+                  <option value="1">Semester 1</option>
+                  <option value="2">Semester 2</option>
+                </Select>
+              </div>
+              <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">Score</label>
                 <Input type="number" placeholder="Score" value={newMark.score || ''} onChange={(e) => setNewMark({ ...newMark, score: e.target.value })} />
               </div>
@@ -468,9 +486,10 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
   const [message, setMessage] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('');
 
   const headers = {
-    'My Marks': ['mark_id', 'subject_id', 'term', 'score'],
+    'My Marks': ['mark_id', 'subject_id', 'term', 'score', 'semester'],
     'My Attendance': ['attendance_id', 'date', 'status'],
     'My Fees': ['fees_id', 'amount', 'status', 'due_date'],
   };
@@ -509,8 +528,8 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
       doc.text(`Course: ${student.course_id}`, 20, 64);
       doc.text(`Class: ${student.class_id}`, 20, 71);
 
-      const tableColumn = ["SUBJECT", "CLASS SCORE (30%)", "EXAM SCORE (70%)", "TOTAL (100%)", "GRADE", "REMARKS"];
-      const tableRows = marks.map(m => [m.subject_id, '', '', m.score, m.grade, m.remarks]); // Assuming class/exam scores are not tracked
+      const tableColumn = ["SUBJECT", "CLASS SCORE (30%)", "EXAM SCORE (70%)", "TOTAL (100%)", "GRADE", "REMARKS", "SEMESTER"];
+      const tableRows = marks.map(m => [m.subject_id, '', '', m.score, m.grade, m.remarks, m.semester]);
 
       doc.autoTable({
         startY: 80,
@@ -531,10 +550,27 @@ const StudentDashboard = ({ activeTab, onTabChange }) => {
     }
   }, [user, fetchData]);
 
+  const filteredMarks = selectedSemester
+    ? data['My Marks'].filter(mark => String(mark.semester) === selectedSemester)
+    : data['My Marks'];
+
   const renderContent = () => {
     switch (activeTab) {
       case 'My Marks':
-        return <Table headers={headers['My Marks']} data={data['My Marks']} />;
+        return (
+          <>
+            <div className="flex justify-end my-4">
+              <div className="w-48">
+                <Select value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)}>
+                  <option value="">All Semesters</option>
+                  <option value="1">Semester 1</option>
+                  <option value="2">Semester 2</option>
+                </Select>
+              </div>
+            </div>
+            <Table headers={headers['My Marks']} data={filteredMarks} />
+          </>
+        );
       case 'My Attendance':
         return <Table headers={headers['My Attendance']} data={data['My Attendance']} />;
       case 'My Fees':
