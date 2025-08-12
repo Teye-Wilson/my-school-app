@@ -331,11 +331,12 @@ const TeacherDashboard = () => {
   const [newMark, setNewMark] = useState({ student_id: '', subject_id: '', term: '', score: '' });
 
   const fetchStudents = useCallback(async () => {
-    const response = await fetcher('getStudents', { teacher_id: user.teacher_id });
+    // Note: Your Apps Script doesn't filter students by teacher. This is a placeholder for future functionality.
+    const response = await fetcher('getStudents');
     if (response.success) {
       setStudents(response.data);
     }
-  }, [user]);
+  }, []);
 
   const fetchMarks = useCallback(async () => {
     const response = await fetcher('getTeacherMarks', { teacher_id: user.teacher_id });
@@ -353,15 +354,25 @@ const TeacherDashboard = () => {
 
   const handleMarkSubmit = async (e) => {
     e.preventDefault();
-    await fetcher('addMark', { ...newMark });
-    setNewMark({ student_id: '', subject_id: '', term: '', score: '' });
-    fetchMarks();
+    if (!newMark.student_id || !newMark.subject_id || !newMark.term || !newMark.score) {
+      alert('Please fill out all fields.');
+      return;
+    }
+    const response = await fetcher('addMark', { ...newMark });
+    if (response.success) {
+      setNewMark({ student_id: '', subject_id: '', term: '', score: '' });
+      fetchMarks(); // Refresh marks after adding
+    } else {
+      alert(`Error: ${response.message}`);
+    }
   };
 
   useEffect(() => {
-    fetchStudents();
-    fetchMarks();
-    fetchAttendance();
+    if (user && user.teacher_id) {
+      fetchStudents();
+      fetchMarks();
+      fetchAttendance();
+    }
   }, [user, fetchStudents, fetchMarks, fetchAttendance]);
 
   const renderContent = () => {
@@ -379,7 +390,9 @@ const TeacherDashboard = () => {
                 <Input type="text" placeholder="Subject ID" value={newMark.subject_id} onChange={(e) => setNewMark({ ...newMark, subject_id: e.target.value })} />
                 <Input type="text" placeholder="Term" value={newMark.term} onChange={(e) => setNewMark({ ...newMark, term: e.target.value })} />
                 <Input type="number" placeholder="Score" value={newMark.score} onChange={(e) => setNewMark({ ...newMark, score: e.target.value })} />
-                <Button onClick={handleMarkSubmit}>Add Mark</Button>
+                <div className="col-span-2">
+                  <Button onClick={handleMarkSubmit}>Add Mark</Button>
+                </div>
               </form>
             </div>
           </>
@@ -411,38 +424,51 @@ const TeacherDashboard = () => {
   );
 };
 
+
 const StudentDashboard = () => {
   const { user } = useContext(AuthContext);
   const [marks, setMarks] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [fees, setFees] = useState([]);
   const [activeTab, setActiveTab] = useState('Marks');
+  const [message, setMessage] = useState('');
 
   const fetchMarks = useCallback(async () => {
+    setMessage('Loading marks...');
     const response = await fetcher('getStudentMarks', { student_id: user.student_id });
     if (response.success) {
       setMarks(response.data);
+    } else {
+      setMessage(`Error: ${response.message}`);
     }
   }, [user]);
 
   const fetchAttendance = useCallback(async () => {
+    setMessage('Loading attendance...');
     const response = await fetcher('getStudentAttendance', { student_id: user.student_id });
     if (response.success) {
       setAttendance(response.data);
+    } else {
+      setMessage(`Error: ${response.message}`);
     }
   }, [user]);
 
   const fetchFees = useCallback(async () => {
+    setMessage('Loading fees...');
     const response = await fetcher('getStudentFees', { student_id: user.student_id });
     if (response.success) {
       setFees(response.data);
+    } else {
+      setMessage(`Error: ${response.message}`);
     }
   }, [user]);
 
   useEffect(() => {
-    fetchMarks();
-    fetchAttendance();
-    fetchFees();
+    if (user && user.student_id) {
+      fetchMarks();
+      fetchAttendance();
+      fetchFees();
+    }
   }, [user, fetchMarks, fetchAttendance, fetchFees]);
 
   const renderContent = () => {
@@ -465,7 +491,10 @@ const StudentDashboard = () => {
         {['Marks', 'Attendance', 'Fees'].map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setMessage('');
+            }}
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
@@ -473,6 +502,7 @@ const StudentDashboard = () => {
           </button>
         ))}
       </div>
+      {message && <div className="text-center my-4 text-lg font-semibold text-indigo-600">{message}</div>}
       {renderContent()}
     </div>
   );
