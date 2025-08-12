@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 // The API_URL for your Google Apps Script Web App
-const API_URL = "https://script.google.com/macros/s/AKfycbxcIlfxcvgXfvpi26TfPeaepa3mKXy8flCtovcSycDrQI6tHIbnanF6p4QPWaETRMum/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyZqM4x67pxr_CY_G1aAX07WUBBCnzHsnmSCnDlTF9oSMcCLq6XUOu1nJN5HlSOGWql/exec";
 
 // Auth context to manage user state globally
 const AuthContext = createContext();
@@ -75,11 +75,12 @@ const Input = ({ type, placeholder, value, onChange }) => (
   />
 );
 
-const Select = ({ children, value, onChange, className = '' }) => (
+const Select = ({ children, value, onChange, className = '', disabled }) => (
   <select
     value={value}
     onChange={onChange}
     className={`w-full px-4 py-2 mt-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 ${className}`}
+    disabled={disabled}
   >
     {children}
   </select>
@@ -209,6 +210,11 @@ const AdminDashboard = ({ activeTab }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [message, setMessage] = useState('');
 
+  // Dropdown data states
+  const [courses, setCourses] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+
   const headers = {
     Students: ['student_id', 'name', 'password', 'course_id', 'class_id'],
     Teachers: ['teacher_id', 'name', 'password', 'email'],
@@ -255,6 +261,9 @@ const AdminDashboard = ({ activeTab }) => {
       Attendance: attendanceRes.data,
       Fees: feesRes.data,
     });
+    setCourses(coursesRes.data);
+    setClasses(classesRes.data);
+    setTeachers(teachersRes.data);
     setMessage('');
   }, []);
 
@@ -297,15 +306,163 @@ const AdminDashboard = ({ activeTab }) => {
   };
 
   const renderForm = () => {
-    const currentHeaders = headers[activeTab].filter(h => h !== idKeys[activeTab] && h !== 'password');
     const formTitle = isEditMode ? `Edit ${activeTab.slice(0, -1)}` : `Add New ${activeTab.slice(0, -1)}`;
+    const isAddingClass = activeTab === 'Classes';
+    const isAddingSubject = activeTab === 'Subjects';
+    const isAddingStudent = activeTab === 'Students';
 
     return (
       <Modal>
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
           <h2 className="text-2xl font-bold mb-4">{formTitle}</h2>
           <form onSubmit={handleAddEdit}>
-            {currentHeaders.map(header => (
+            {isAddingClass && (
+              <>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Class ID</label>
+                  <Input
+                    type="text"
+                    placeholder="class_id"
+                    value={formData.class_id || ''}
+                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Class Name</label>
+                  <Input
+                    type="text"
+                    placeholder="class_name"
+                    value={formData.class_name || ''}
+                    onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Course</label>
+                  <Select
+                    value={formData.course_id || ''}
+                    onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
+                  >
+                    <option value="">Select Course</option>
+                    {courses.map(course => (
+                      <option key={course.course_id} value={course.course_id}>
+                        {course.course_name} ({course.course_id})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
+            {isAddingSubject && (
+              <>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Subject ID</label>
+                  <Input
+                    type="text"
+                    placeholder="subject_id"
+                    value={formData.subject_id || ''}
+                    onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Subject Name</label>
+                  <Input
+                    type="text"
+                    placeholder="subject_name"
+                    value={formData.subject_name || ''}
+                    onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Teacher</label>
+                  <Select
+                    value={formData.teacher_id || ''}
+                    onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })}
+                  >
+                    <option value="">Select Teacher</option>
+                    {teachers.map(teacher => (
+                      <option key={teacher.teacher_id} value={teacher.teacher_id}>
+                        {teacher.name} ({teacher.teacher_id})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
+                  <Select
+                    value={formData.class_id || ''}
+                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                  >
+                    <option value="">Select Class</option>
+                    {classes.map(classItem => (
+                      <option key={classItem.class_id} value={classItem.class_id}>
+                        {classItem.class_name} ({classItem.class_id})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
+            {isAddingStudent && (
+              <>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Student ID</label>
+                  <Input
+                    type="text"
+                    placeholder="student_id"
+                    value={formData.student_id || ''}
+                    onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Name</label>
+                  <Input
+                    type="text"
+                    placeholder="name"
+                    value={formData.name || ''}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                  <Input
+                    type="password"
+                    placeholder="password"
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Course</label>
+                  <Select
+                    value={formData.course_id || ''}
+                    onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
+                  >
+                    <option value="">Select Course</option>
+                    {courses.map(course => (
+                      <option key={course.course_id} value={course.course_id}>
+                        {course.course_name} ({course.course_id})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
+                  <Select
+                    value={formData.class_id || ''}
+                    onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                  >
+                    <option value="">Select Class</option>
+                    {classes.map(classItem => (
+                      <option key={classItem.class_id} value={classItem.class_id}>
+                        {classItem.class_name} ({classItem.class_id})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
+            {/* For other tables, just use standard inputs */}
+            {!(isAddingClass || isAddingSubject || isAddingStudent) && headers[activeTab].filter(h => h !== idKeys[activeTab]).map(header => (
               <div key={header} className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">{header.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</label>
                 <Input
@@ -355,9 +512,10 @@ const AdminDashboard = ({ activeTab }) => {
 const TeacherDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
-  const [showAddMarkForm, setShowAddMarkForm] = useState(false);
-  const [newMark, setNewMark] = useState({});
   const [message, setMessage] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [marksToSubmit, setMarksToSubmit] = useState({});
 
   const headers = {
     'My Students': ['student_id', 'name', 'course_id', 'class_id'],
@@ -374,6 +532,8 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
         'My Students': response.data.students,
         'Marks': response.data.marks,
         'Attendance': response.data.attendance,
+        'Subjects': response.data.subjects,
+        'Classes': response.data.classes,
       });
     }
     setMessage('');
@@ -385,14 +545,33 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
     }
   }, [user, fetchData]);
 
-  const handleAddMark = async (e) => {
-    e.preventDefault();
-    setMessage('Adding mark...');
-    const response = await fetcher('addMark', newMark);
+  const handleMarkChange = (studentId, value) => {
+    setMarksToSubmit(prev => ({
+      ...prev,
+      [studentId]: {
+        score: value,
+        term: 'Term 1', // Assuming a single term for simplicity
+        semester: 1, // Assuming semester 1 for simplicity
+      }
+    }));
+  };
+
+  const handleSubmitMarks = async () => {
+    setMessage('Submitting marks...');
+    const marksPayload = Object.keys(marksToSubmit).map(student_id => ({
+      student_id,
+      subject_id: selectedSubject,
+      score: marksToSubmit[student_id].score,
+      term: marksToSubmit[student_id].term,
+      semester: marksToSubmit[student_id].semester,
+    }));
+
+    const response = await fetcher('addMultipleMarks', { marks: marksPayload });
     if (response.success) {
-      setMessage('Mark added successfully!');
-      setNewMark({});
-      setShowAddMarkForm(false);
+      setMessage('Marks submitted successfully!');
+      setMarksToSubmit({});
+      setSelectedClass('');
+      setSelectedSubject('');
       fetchData();
     } else {
       setMessage(`Error: ${response.message}`);
@@ -412,6 +591,79 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
     }
   };
 
+  const renderEnterMarksForm = () => {
+    const filteredStudents = data['My Students']?.filter(student =>
+      student.class_id === selectedClass &&
+      data['Subjects']?.some(subject => subject.subject_id === selectedSubject && subject.class_id === selectedClass)
+    ) || [];
+
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-lg mt-6">
+        <h3 className="text-2xl font-bold mb-4">Enter Marks</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Subject</label>
+            <Select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+              <option value="">Select Subject</option>
+              {data['Subjects']?.map(subject => (
+                <option key={subject.subject_id} value={subject.subject_id}>
+                  {subject.subject_name} ({subject.subject_id})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Class</label>
+            <Select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} disabled={!selectedSubject}>
+              <option value="">Select Class</option>
+              {data['Classes']?.filter(cls => data['Subjects']?.some(sub => sub.class_id === cls.class_id && sub.subject_id === selectedSubject)).map(classItem => (
+                <option key={classItem.class_id} value={classItem.class_id}>
+                  {classItem.class_name} ({classItem.class_id})
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        {selectedSubject && selectedClass && (
+          <div className="mt-6">
+            <h4 className="text-xl font-semibold mb-4">Students in {data['Classes']?.find(c => c.class_id === selectedClass)?.class_name} doing {data['Subjects']?.find(s => s.subject_id === selectedSubject)?.subject_name}</h4>
+            {filteredStudents.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredStudents.map(student => (
+                      <tr key={student.student_id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <Input
+                            type="number"
+                            placeholder="Score"
+                            value={marksToSubmit[student.student_id]?.score || ''}
+                            onChange={(e) => handleMarkChange(student.student_id, e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Button onClick={handleSubmitMarks} className="mt-4">Submit Marks</Button>
+              </div>
+            ) : (
+              <p className="text-gray-500">No students found for the selected subject and class.</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+
   return (
     <div className="flex flex-col flex-grow p-8">
       <Header title="Teacher Dashboard" />
@@ -427,49 +679,17 @@ const TeacherDashboard = ({ activeTab, onTabChange }) => {
             {tab}
           </button>
         ))}
+        <button
+          onClick={() => onTabChange('Enter Marks')}
+          className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === 'Enter Marks' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+        >
+          Enter Marks
+        </button>
       </div>
-      {activeTab === 'Marks' && (
-        <Button onClick={() => setShowAddMarkForm(!showAddMarkForm)} className="w-auto px-6 py-2 mb-4">
-          {showAddMarkForm ? 'Hide Form' : 'Add New Mark'}
-        </Button>
-      )}
-      {showAddMarkForm && (
-        <Modal>
-          <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">Add New Mark</h2>
-            <form onSubmit={handleAddMark}>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">Student ID</label>
-                <Input type="text" placeholder="Student ID" value={newMark.student_id || ''} onChange={(e) => setNewMark({ ...newMark, student_id: e.target.value })} />
-              </div>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">Subject ID</label>
-                <Input type="text" placeholder="Subject ID" value={newMark.subject_id || ''} onChange={(e) => setNewMark({ ...newMark, subject_id: e.target.value })} />
-              </div>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">Term</label>
-                <Input type="text" placeholder="Term" value={newMark.term || ''} onChange={(e) => setNewMark({ ...newMark, term: e.target.value })} />
-              </div>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">Semester</label>
-                <Select value={newMark.semester || ''} onChange={(e) => setNewMark({ ...newMark, semester: e.target.value })}>
-                  <option value="" disabled>Select Semester</option>
-                  <option value="1">Semester 1</option>
-                  <option value="2">Semester 2</option>
-                </Select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">Score</label>
-                <Input type="number" placeholder="Score" value={newMark.score || ''} onChange={(e) => setNewMark({ ...newMark, score: e.target.value })} />
-              </div>
-              <div className="flex justify-end space-x-4 mt-4">
-                <Button onClick={() => { setShowAddMarkForm(false); setNewMark({}); }} className="bg-gray-400 hover:bg-gray-500">Cancel</Button>
-                <Button onClick={handleAddMark}>Add Mark</Button>
-              </div>
-            </form>
-          </div>
-        </Modal>
-      )}
+
+      {activeTab === 'Enter Marks' && renderEnterMarksForm()}
+
       {data[activeTab] && (
         <Table
           headers={headers[activeTab]}
