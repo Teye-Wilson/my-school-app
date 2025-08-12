@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 
 // The API_URL for your Google Apps Script Web App
 // This is the latest URL you provided.
-const API_URL = "https://script.google.com/macros/s/AKfycbyVjh7tUIGsa8Z61kH4pWS94ANLrpPADp_HZJG7UBms_qKfmzDGecDP-sbFT6WcusRV/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyTcViZ8D1YxXZzThlpVcD6Heku2Tutx9yPjHdln8FN52nArC8_9CfFXh-tb_20scgq/exec";
 
 // The corrected fetcher function that sends the request in the correct format.
 // It now uses "action" and "payload" to match your Apps Script.
@@ -181,9 +181,24 @@ const Table = ({ headers, data }) => (
 
 const AdminDashboard = () => {
   const [data, setData] = useState({});
-  const [activeTab, setActiveTab] = useState('Admins');
+  const [activeTab, setActiveTab] = useState('Students');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newEntry, setNewEntry] = useState({});
+  const [message, setMessage] = useState('');
+
+  const headers = {
+    Admins: ['admin_id', 'password', 'name'],
+    Teachers: ['teacher_id', 'password', 'name', 'email'],
+    Students: ['student_id', 'password', 'name', 'class', 'parent_name', 'phone'],
+    Classes: ['class_id', 'class_name', 'teacher_id', 'subject_ids'],
+    Subjects: ['subject_id', 'subject_name'],
+    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score'],
+    Attendance: ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
+    Fees: ['fees_id', 'student_id', 'amount', 'status', 'due_date'],
+  };
 
   const fetchData = useCallback(async () => {
+    setMessage('Loading data...');
     const [admins, teachers, students, classes, subjects, marks, attendance, fees] = await Promise.all([
       fetcher('getAdmins'),
       fetcher('getTeachers'),
@@ -204,21 +219,66 @@ const AdminDashboard = () => {
       Attendance: attendance.data,
       Fees: fees.data,
     });
+    setMessage('');
   }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const headers = {
-    Admins: ['admin_id', 'password', 'name'],
-    Teachers: ['teacher_id', 'password', 'name', 'email'],
-    Students: ['student_id', 'password', 'name', 'class', 'parent_name', 'phone'],
-    Classes: ['class_id', 'class_name', 'teacher_id', 'subject_ids'],
-    Subjects: ['subject_id', 'subject_name'],
-    Marks: ['mark_id', 'student_id', 'subject_id', 'term', 'score'],
-    Attendance: ['attendance_id', 'student_id', 'class_id', 'date', 'status'],
-    Fees: ['fees_id', 'student_id', 'amount', 'status', 'due_date'],
+  const handleAddSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('Adding new entry...');
+    let action;
+    switch (activeTab) {
+      case 'Teachers':
+        action = 'addTeacher';
+        break;
+      case 'Students':
+        action = 'addStudent';
+        break;
+      case 'Classes':
+        action = 'addClass';
+        break;
+      case 'Subjects':
+        action = 'addSubject';
+        break;
+      default:
+        setMessage('Cannot add data for this tab.');
+        return;
+    }
+    const response = await fetcher(action, newEntry);
+    if (response.success) {
+      setMessage(`Successfully added new ${activeTab.toLowerCase()}!`);
+      setNewEntry({});
+      setShowAddForm(false);
+      fetchData(); // Refresh data
+    } else {
+      setMessage(`Error: ${response.message}`);
+    }
+  };
+
+  const renderAddForm = () => {
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-lg mt-6">
+        <h3 className="text-xl font-bold mb-4">Add New {activeTab.slice(0, -1)}</h3>
+        <form onSubmit={handleAddSubmit} className="grid grid-cols-2 gap-4">
+          {headers[activeTab].map(header => (
+            <Input
+              key={header}
+              type="text"
+              placeholder={header.charAt(0).toUpperCase() + header.slice(1).replace('_', ' ')}
+              value={newEntry[header] || ''}
+              onChange={(e) => setNewEntry({ ...newEntry, [header]: e.target.value })}
+            />
+          ))}
+          <div className="col-span-2 flex space-x-4">
+            <Button onClick={handleAddSubmit}>Add</Button>
+            <Button onClick={() => setShowAddForm(false)} className="bg-gray-400 hover:bg-gray-500">Cancel</Button>
+          </div>
+        </form>
+      </div>
+    );
   };
 
   return (
@@ -228,7 +288,12 @@ const AdminDashboard = () => {
         {Object.keys(headers).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setShowAddForm(false);
+              setNewEntry({});
+              setMessage('');
+            }}
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
@@ -236,6 +301,15 @@ const AdminDashboard = () => {
           </button>
         ))}
       </div>
+      {message && <div className="text-center my-4 text-lg font-semibold text-indigo-600">{message}</div>}
+      <div className="flex justify-end my-4">
+        {['Teachers', 'Students', 'Classes', 'Subjects'].includes(activeTab) && (
+          <Button onClick={() => setShowAddForm(!showAddForm)} className="w-auto px-6 py-2">
+            {showAddForm ? 'Hide Form' : `Add New ${activeTab.slice(0, -1)}`}
+          </Button>
+        )}
+      </div>
+      {showAddForm && renderAddForm()}
       {data[activeTab] && (
         <Table
           headers={headers[activeTab]}
@@ -245,6 +319,8 @@ const AdminDashboard = () => {
     </div>
   );
 };
+
+
 
 const TeacherDashboard = () => {
   const { user } = useContext(AuthContext);
