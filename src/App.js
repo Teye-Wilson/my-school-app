@@ -1,14 +1,13 @@
 import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // The API_URL for your Google Apps Script Web App
-const API_URL = "https://script.google.com/macros/s/AKfycbyHgkAtQZfAz-QL2SzdM5OEcOIt1CUPoLhoiv9Nyvyb35Ec6VVP1NnC5eO5/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyHgkAtQZfAz-QL2SzdM5OEcOIt1CUPoLhoiv9Nyvyb35Ec6VVP1yiWEvyP0NnC5eO5/exec";
 
 // Auth context to manage user state globally
 const AuthContext = createContext();
-
-// PDF library for report card generation
-const jsPDF = require('jspdf');
 
 async function fetcher(action, payload = {}) {
   try {
@@ -142,7 +141,7 @@ const Sidebar = ({ onTabChange, activeTab }) => {
   const { role, logout } = useContext(AuthContext);
 
   const adminNavItems = ['Students', 'Teachers', 'Courses', 'Classes', 'Subjects', 'Marks', 'Attendance', 'Fees'];
-  const teacherNavItems = ['My Classes', 'My Students', 'Marks', 'Attendance'];
+  const teacherNavItems = ['My Students', 'Marks', 'Attendance'];
   const studentNavItems = ['My Marks', 'My Attendance', 'My Fees', 'My Report Card'];
   const getNavItems = () => {
     switch (role) {
@@ -184,7 +183,7 @@ const Sidebar = ({ onTabChange, activeTab }) => {
 
 const Header = ({ title }) => {
   const { user } = useContext(AuthContext);
-  const name = user ? user.name || user.course_name || user.class_name || user.subject_name : 'Guest';
+  const name = user ? user.name || 'User' : 'Guest';
   return (
     <header className="flex justify-between items-center bg-white p-6 rounded-xl shadow-md mb-6">
       <h1 className="text-3xl font-bold text-indigo-900">{title}</h1>
@@ -193,16 +192,12 @@ const Header = ({ title }) => {
   );
 };
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ activeTab, onTabChange }) => {
   const [data, setData] = useState({});
-  const [activeTab, setActiveTab] = useState('Students');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({});
   const [isEditMode, setIsEditMode] = useState(false);
   const [message, setMessage] = useState('');
-  const [courses, setCourses] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [teachers, setTeachers] = useState([]);
 
   const headers = {
     Students: ['student_id', 'name', 'password', 'course_id', 'class_id'],
@@ -225,17 +220,6 @@ const AdminDashboard = () => {
     Attendance: 'attendance_id',
     Fees: 'fees_id',
   };
-
-  const fetchDependencies = useCallback(async () => {
-    const [coursesRes, classesRes, teachersRes] = await Promise.all([
-      fetcher('getCourses'),
-      fetcher('getClasses'),
-      fetcher('getTeachers')
-    ]);
-    setCourses(coursesRes.data);
-    setClasses(classesRes.data);
-    setTeachers(teachersRes.data);
-  }, []);
 
   const fetchData = useCallback(async () => {
     setMessage('Loading data...');
@@ -266,8 +250,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchData();
-    fetchDependencies();
-  }, [fetchData, fetchDependencies]);
+  }, [fetchData]);
 
   const handleAddEdit = async (e) => {
     e.preventDefault();
@@ -359,10 +342,9 @@ const AdminDashboard = () => {
 };
 
 
-const TeacherDashboard = () => {
+const TeacherDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
-  const [activeTab, setActiveTab] = useState('My Students');
   const [showAddMarkForm, setShowAddMarkForm] = useState(false);
   const [newMark, setNewMark] = useState({});
   const [message, setMessage] = useState('');
@@ -428,7 +410,7 @@ const TeacherDashboard = () => {
         {Object.keys(headers).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => onTabChange(tab)}
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
@@ -482,12 +464,10 @@ const TeacherDashboard = () => {
   );
 };
 
-const StudentDashboard = () => {
+const StudentDashboard = ({ activeTab, onTabChange }) => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
-  const [activeTab, setActiveTab] = useState('My Marks');
   const [message, setMessage] = useState('');
-  const reportCardRef = useRef(null);
 
   const headers = {
     'My Marks': ['mark_id', 'subject_id', 'term', 'score'],
@@ -581,7 +561,7 @@ const StudentDashboard = () => {
         {['My Marks', 'My Attendance', 'My Fees', 'My Report Card'].map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => onTabChange(tab)}
             className={`px-4 py-2 font-semibold rounded-lg transition-colors ${activeTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
           >
@@ -677,14 +657,15 @@ const LoginForm = ({ role, onClose }) => {
 const MainApp = () => {
   const { role } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('Students');
+
   const renderDashboard = () => {
     switch (role) {
       case 'admin':
-        return <AdminDashboard onTabChange={setActiveTab} activeTab={activeTab} />;
+        return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'teacher':
-        return <TeacherDashboard onTabChange={setActiveTab} activeTab={activeTab} />;
+        return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'student':
-        return <StudentDashboard onTabChange={setActiveTab} activeTab={activeTab} />;
+        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
         return <HomePage />;
     }
